@@ -16,7 +16,6 @@ import android.support.test.uiautomator.Until;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -51,10 +50,13 @@ public class BilityTester {
     private int LAUNCH_TIMEOUT = 5000;
     private int TEST_RUNS = 1;
     private int MAX_ACTIONS = 5;
+    private int LOG_LEVEL = 0;
+    private boolean DYNAMICALLY_AWARE = true;
     private List<TestSuiteType> runningSuites;
 
     // RESULTS
     private int actionCount = 0;
+    private List<TestResult> testResults;
 
     public BilityTester(AppSpecification app, UiDevice uiDevice) {
         this.app = app;
@@ -86,6 +88,16 @@ public class BilityTester {
 
     public BilityTester setSeed(long seed) {
         this.rand.setSeed(seed);
+        return this;
+    }
+
+    public BilityTester setDynamicallyAware(boolean aware) {
+        this.DYNAMICALLY_AWARE = aware;
+        return this;
+    }
+
+    public BilityTester setLogLevel(int level) {
+        this.LOG_LEVEL = level;
         return this;
     }
 
@@ -128,12 +140,13 @@ public class BilityTester {
         uiDevice.waitForIdle();
 
         printTestSetup();
+        testResults = new ArrayList<>();
 
         return this;
 
     }
 
-    public void startTestLoop() {
+    public BilityTester startTestLoop() {
 
         // First, get information about the current screen, and what is shown
         // If the current activity instance is not good, go back
@@ -148,7 +161,7 @@ public class BilityTester {
 
         // TODO: If goal state has been reached, terminate the test loop
         if (actionCount >= MAX_ACTIONS) {
-            return;
+            return this;
         }
 
         // Then, come up with an estimate for what next action to take
@@ -158,7 +171,7 @@ public class BilityTester {
         // If no subject was found for this action, retry
         if (subject == null) {
 
-            startTestLoop();
+            return startTestLoop();
 
         } else {
 
@@ -172,7 +185,7 @@ public class BilityTester {
 
             // Call the start loop again
             uiDevice.waitForIdle(2000);
-            startTestLoop();
+            return startTestLoop();
 
         }
 
@@ -187,10 +200,24 @@ public class BilityTester {
 
     }
 
-    public BilityTester printResults() {
-        return this;
-    }
+    public void printTestResults() {
 
+        int totalCount = 0;
+        List<TestResult> failingTests = new ArrayList<>();
+        for (TestResult res : testResults) {
+            totalCount++;
+            if (!res.isPassed()) {
+                failingTests.add(res);
+            }
+        }
+
+        Log.e("BILITY TEST", totalCount - failingTests.size() + "/" + totalCount + " views passed WCAG2 1.1.1");
+        for(TestResult test : failingTests) {
+            Log.e("BILITY TEST", "\nFAILED:\n" + test.toString());
+            System.out.println(test.toString());
+        }
+
+    }
 
     // Private helper functions
 
@@ -232,7 +259,7 @@ public class BilityTester {
         //      class of the view
         //      Flattened child class list if this is a viewgroup
 
-        Log.e("CONDENSE", "Started with num views: " + views.size());
+        //Log.e("CONDENSE", "Started with num views: " + views.size());
 
         Map<Integer, List<View>> uniqueGroups = new HashMap<>();
 
@@ -257,7 +284,7 @@ public class BilityTester {
 
         }
 
-        Log.e("CONDENSE", "Ended with num views: " + uniqueGroups.size());
+        //Log.e("CONDENSE", "Ended with num views: " + uniqueGroups.size());
 
         return uniqueGroups;
 
@@ -268,32 +295,24 @@ public class BilityTester {
         View toSearch = activity.getWindow().getDecorView().getRootView();
         int passCount = 0;
         int totalCount = 0;
-        List<TestResult> failingTests = new ArrayList<>();
         List<View> allViews = ViewHelper.getAllViews(toSearch);
 
-        Map<Integer, List<View>> groupedUniques = getStructurallyUniqueSubset(allViews);
-        List<View> uniqueViews = new ArrayList<>();
-        for (Integer key : groupedUniques.keySet()) {
-            uniqueViews.add(groupedUniques.get(key).get(0));
+        if (DYNAMICALLY_AWARE) {
+            Map<Integer, List<View>> groupedUniques = getStructurallyUniqueSubset(allViews);
+            List<View> uniqueViews = new ArrayList<>();
+            for (Integer key : groupedUniques.keySet()) {
+                uniqueViews.add(groupedUniques.get(key).get(0));
+            }
+            allViews = uniqueViews;
+            //Log.e("Using unique views", "" + allViews.size());
         }
 
-        Log.e("Views", "" + allViews.size());
-        Log.e("Using Unique Views", "" + uniqueViews.size());
-        for (View v : uniqueViews) {
+        for (View v : allViews) {
             totalCount++;
             TestResult res = WCAG2.testPrinciple_1_1_1(v);
-            if (res.isPassed()) {
-                passCount++;
-            } else {
-                failingTests.add(res);
+            if (!testResults.contains(res)) {
+                testResults.add(res);
             }
-        }
-
-        Log.e("Fail count", "" + failingTests.size());
-        Log.e("TEST RESULTS", passCount + "/" + totalCount + " views passed WCAG2 1.1.1");
-        for(TestResult test : failingTests) {
-            Log.e("FAILED", test.toString());
-            System.out.println(test.toString());
         }
 
     }

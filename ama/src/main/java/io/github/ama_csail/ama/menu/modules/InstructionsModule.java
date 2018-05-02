@@ -83,7 +83,6 @@ public class InstructionsModule implements Content, MenuModule {
         // TODO This is bad, because we don't know when we need to reload, since it may depend
         // on the configuration. This means that configuration should be a better object
         if (listener != null) {
-            Log.e("MENU", "REFRESHED INSTRUCTIONS");
             listener.onInstructionsLoaded(currentView, configuration);
         }
     }

@@ -57,15 +57,18 @@ public class ExampleInstrumentedTest {
 
         UiDevice mDevice = UiDevice.getInstance(getInstrumentation());
 
-        new BilityTester(specification, mDevice)
+        BilityTester tester = new BilityTester(specification, mDevice)
                 .provideSocket(socket)
                 .setTimeout(5000)
                 .setRuns(3)
-                .setSeed(20182018)
+                //.setSeed(20182018)
                 .setMaxActions(7)
                 .setTestSuites(TestSuiteType.WCAG2_A)
+                .setDynamicallyAware(true)
                 .startupApp()
                 .startTestLoop();
+
+        tester.printTestResults();
 
 //        final File screenFile = new File(Environment.getExternalStorageDirectory(), "screenshotTest.png");
 //        final File viewFile = new File(Environment.getExternalStorageDirectory(), "viewFile.xml");

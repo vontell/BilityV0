@@ -36,7 +36,6 @@ public class AccessibleHoverMenuService extends HoverMenuService {
         possiblyRegisterModule(MenuModuleType.HOME);
         hoverView.setMenu(menu);
         hoverView.collapse();
-        Log.e("MENU", "Menu started");
     }
 
     /**

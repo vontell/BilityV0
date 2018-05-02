@@ -111,7 +111,6 @@ public class AccessibleActivity extends AppCompatActivity {
             //if (binder != null) {
                 menuService = binder.getService();
                 menuBound = true;
-                Log.e("CONNECTION", "Menu connection successful");
 
                 if (menuConnectedListener != null) {
                     menuConnectedListener.configureMenu();

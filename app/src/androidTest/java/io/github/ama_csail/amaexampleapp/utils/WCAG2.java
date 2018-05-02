@@ -47,7 +47,8 @@ public class WCAG2 {
         TestResult result = new TestResult(
                 "WCAG 2.0 - 1.1.1 Non-text Content",
                 "Non-text content that is presented to the user has a text alternative " +
-                        "that serves the equivalent purpose"
+                        "that serves the equivalent purpose",
+                TestClassification.WCAG21_1_1
         );
 
         // If this is a TextView, then Android handles this automatically
@@ -59,6 +60,7 @@ public class WCAG2 {
                 result.setPassed(false);
                 result.setTestError("This TextView has no text, and should therefore have a content description.");
                 result.setSuggestion("Please make sure that this TextView has a content description.");
+                if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
                 return result;
             }
 
@@ -67,11 +69,13 @@ public class WCAG2 {
                 result.setPassed(false);
                 result.setTestError("This TextView has an insufficient content description.");
                 result.setSuggestion("This text does have a content description, but it is not sufficient for providing information to a user.");
+                if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
                 return result;
             }
 
             result.setPassed(true);
             result.setSuggestion("No suggestion - TextViews do not need text alternatives.");
+            if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
             return result;
 
         }
@@ -87,18 +91,20 @@ public class WCAG2 {
                     result.setPassed(false);
                     result.setTestError("This ImageView-type has an insufficient content description.");
                     result.setSuggestion("This image does have a content description, but it is not sufficient for providing information to a user.");
+                    if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
                     return result;
                 }
 
                 result.setPassed(false);
                 result.setTestError("This ImageView-type view does not have a content description.");
                 result.setSuggestion("Please make sure that this ImageView has a content description.");
-                result.setIdentifier(view.getResources().getResourceName(view.getId()));
+                if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
                 return result;
 
             } else {
                 result.setPassed(true);
                 result.setSuggestion("No suggestion - ImageView does have alternative text.");
+                if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
                 return result;
             }
 
@@ -108,6 +114,7 @@ public class WCAG2 {
         // decoration.
         result.setPassed(true);
         result.setSuggestion("No suggestion - This may be a custom component, container, or decoration.");
+        if (view.getId() > 0) result.setIdentifier(view.getResources().getResourceName(view.getId()));
 
         return result;
 
