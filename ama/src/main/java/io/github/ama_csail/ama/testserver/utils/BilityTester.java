@@ -1,6 +1,8 @@
-package io.github.ama_csail.amaexampleapp.utils;
+package io.github.ama_csail.ama.testserver.utils;
 
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.FragmentManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Environment;
@@ -13,6 +15,8 @@ import android.support.test.uiautomator.UiObject;
 import android.support.test.uiautomator.UiObjectNotFoundException;
 import android.support.test.uiautomator.UiSelector;
 import android.support.test.uiautomator.Until;
+import android.support.v4.app.Fragment;
+import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -34,6 +38,7 @@ import io.github.ama_csail.ama.testserver.automatons.SimpleAutomataState;
 import io.github.ama_csail.ama.testserver.automatons.SimpleAutomaton;
 import io.github.ama_csail.ama.util.views.ViewHelper;
 
+import static android.content.Context.ACTIVITY_SERVICE;
 import static android.support.test.InstrumentationRegistry.getInstrumentation;
 import static org.hamcrest.core.IsNull.notNullValue;
 import static org.junit.Assert.assertThat;
@@ -47,6 +52,7 @@ public class BilityTester {
     private AppSpecification app;
     private UiDevice uiDevice;
     private MobileSocket socket;
+    private Context context;
 
     private Random rand;
 
@@ -129,7 +135,7 @@ public class BilityTester {
                 LAUNCH_TIMEOUT);
 
         // Launch the app
-        Context context = InstrumentationRegistry.getContext();
+        context = InstrumentationRegistry.getContext();
         final Intent intent = context.getPackageManager()
                 .getLaunchIntentForPackage(appPackageName);
 
@@ -141,68 +147,111 @@ public class BilityTester {
         uiDevice.wait(Until.hasObject(By.pkg(appPackageName).depth(0)),
                 LAUNCH_TIMEOUT);
 
-        uiDevice.waitForIdle();
+        uiDevice.waitForIdle(2000);
 
         printTestSetup();
         testResults = new ArrayList<>();
 
         // Save the start state of the automaton
-        SimpleAutomataState startState = new SimpleAutomataState(getActivityInstance().getLocalClassName() + " Screen");
+        String name = getIdentifierFromActivity(getActivityInstance());
+        Log.e("NAMING", name);
+        SimpleAutomataState startState = new SimpleAutomataState(name);
         automaton = new SimpleAutomaton(startState);
 
         return this;
 
     }
 
-    public BilityTester startTestLoop() {
+    public BilityTester startTest() {
+
+        try {
+            startTestLoop();
+            return this;
+        } catch (Exception e) {
+            Log.e("BILITY EXCEPTION", e.getLocalizedMessage());
+            startupApp();
+            return startTest();
+        }
+
+    }
+
+    private void startTestLoop() {
 
         // First, get information about the current screen, and what is shown
         // If the current activity instance is not good, go back
-        boolean shouldGoBack = false;
-        Activity currentActivity = getActivityInstance();
-        if (currentActivity != null) {
-            evaluateAccessibility(currentActivity);
-        } else {
-            shouldGoBack = true;
-        }
 
+        while (actionCount < MAX_ACTIONS) {
 
-        // TODO: If goal state has been reached, terminate the test loop
-        if (actionCount >= MAX_ACTIONS) {
-            return this;
-        }
-
-        // Then, come up with an estimate for what next action to take
-        UiInputActionType nextAction = !shouldGoBack ? getNextActionType() : UiInputActionType.BACK;
-        UiObject subject = getNextActionSubject(nextAction);
-
-        // If no subject was found for this action, retry
-        if (subject == null) {
-
-            return startTestLoop();
-
-        } else {
-
-            // Finally, execute that action
-            try {
-                Log.e("ACTION", "Performing " + nextAction + " on " + subject.getClassName());
-            } catch (UiObjectNotFoundException e) {
-                e.printStackTrace();
-            }
-            SimpleAutomataAction action = executeNextAction(nextAction, subject);
-
-            // Call the start loop again
-            uiDevice.waitForIdle(2000);
-
-            Activity resultingActivity = getActivityInstance();
-            if (action != null && resultingActivity != null) {
-                automaton.transitionFromCurrentState(action,
-                        new SimpleAutomataState(resultingActivity.getLocalClassName() + " Screen"));
+            boolean shouldGoBack = false;
+            uiDevice.waitForIdle(500);
+            Activity currentActivity = getActivityInstance();
+            if (currentActivity != null) {
+                evaluateAccessibility(currentActivity);
+            } else {
+                continue;
+                //shouldGoBack = true;
             }
 
-            return startTestLoop();
+            // Then, come up with an estimate for what next action to take
+            Log.e("TIMING", "GETTING NEW ACTION");
+            UiInputActionType nextAction = !shouldGoBack ? getNextActionType() : UiInputActionType.BACK;
+            Log.e("TIMING", "GOT ACTION: " + nextAction.name());
+            Log.e("TIMING", "GETTING NEW SUBJECT");
+            UiObject subject = getNextActionSubject(nextAction);
+
+            // If no subject was found for this action, retry
+            if (subject == null || !subject.exists()) {
+
+                Log.e("TIMING", "BAD SUBJECT FOUND; TRYING AGAIN");
+
+            } else {
+
+                // Finally, execute that action
+                try {
+                    Log.e("TIMING", "GOT NEW SUBJECT: " + subject.toString());
+                    Log.e("TIMING", "PERFORMING " + nextAction + " ON " + subject.getClassName());
+                } catch (UiObjectNotFoundException e) {
+                    e.printStackTrace();
+                }
+                SimpleAutomataAction action = executeNextAction(nextAction, subject);
+                Log.e("TIMING", "ACTION FINISHED EXECUTING");
+
+                // Call the start loop again
+                uiDevice.waitForIdle(500);
+
+                Activity resultingActivity = getActivityInstance();
+                if (action != null && resultingActivity != null) {
+                    String name = getIdentifierFromActivity(resultingActivity);
+                    Log.e("NAMING", name);
+                    automaton.transitionFromCurrentState(action,
+                            new SimpleAutomataState(name));
+                }
+
+                Log.e("TIMING", "ABOUT TO START NEW LOOP");
+                Log.e("AUTOMATON", automaton.getStringForGraphViz());
+
+            }
 
         }
+
+    }
+
+    public String getIdentifierFromActivity(Activity activity) {
+
+        if (activity == null) {
+            return "Unknown User Interface";
+        }
+
+        if (activity instanceof AppCompatActivity) {
+            android.support.v4.app.FragmentManager manager = ((AppCompatActivity) activity).getSupportFragmentManager();
+            for (Fragment frag : manager.getFragments()) {
+                if (frag.isVisible()) {
+                    return "Fragment[" + frag.getClass().getSimpleName() + "] in " + frag.getActivity().getLocalClassName();
+                }
+            }
+        }
+
+        return activity.getLocalClassName();
 
     }
 
@@ -228,14 +277,13 @@ public class BilityTester {
 
         Log.e("BILITY TEST", totalCount - failingTests.size() + "/" + totalCount + " views passed WCAG2 1.1.1");
         for(TestResult test : failingTests) {
-            Log.e("BILITY TEST", "\nFAILED:\n" + test.toString());
-            System.out.println(test.toString());
+            //Log.e("BILITY TEST", "\nFAILED:\n" + test.toString());
+            //System.out.println(test.toString());
         }
-
         System.out.println(automaton.getStringForGraphViz());
-        automaton.writeDotFile();
-        automaton.dotFileToPng();
-        automaton.displayAutomatonImage();
+        //automaton.writeDotFile();
+        //automaton.dotFileToPng();
+        //automaton.displayAutomatonImage();
 
     }
 
@@ -354,14 +402,15 @@ public class BilityTester {
 
     // Randomization
 
-    private static final double CLICK_PROB_BOUND = 0.01;
-    private static final double SWIPE_PROB_BOUND = 0.9;
-    private static final double BACK_PROB_BOUND = 0.90001;
-    private static final double LONGCLICK_PROB = 1.00;
+    private static final double CLICK_PROB_BOUND = 0.55;
+    private static final double SWIPE_PROB_BOUND = 0.95;
+    private static final double BACK_PROB_BOUND = 1;
+    private static final double LONGCLICK_PROB = 0.6;
 
     private UiInputActionType getNextActionType() {
 
         float probDecider = rand.nextFloat();
+        Log.e("PROBABILITY", "" + probDecider);
         if (probDecider <= CLICK_PROB_BOUND) {
             return UiInputActionType.CLICK;
         } else if (probDecider <= SWIPE_PROB_BOUND) {
