@@ -31,7 +31,7 @@ import static org.junit.Assert.*;
  */
 @RunWith(AndroidJUnit4.class)
 @SdkSuppress(minSdkVersion = 18)
-public class ExampleInstrumentedTest {
+public class AccessibilityTest {
 
     private AppSpecification specification;
 

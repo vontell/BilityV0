@@ -68,6 +68,9 @@ public class BilityTester {
     private List<TestResult> testResults;
     private SimpleAutomaton automaton;
 
+    private SimpleAutomataState prevState = null;
+    private int previousStateCount = 0;
+
     public BilityTester(AppSpecification app, UiDevice uiDevice) {
         this.app = app;
         this.uiDevice = uiDevice;
@@ -156,9 +159,39 @@ public class BilityTester {
         String name = getIdentifierFromActivity(getActivityInstance());
         Log.e("NAMING", name);
         SimpleAutomataState startState = new SimpleAutomataState(name);
+        prevState = startState;
         automaton = new SimpleAutomaton(startState);
 
         return this;
+
+    }
+
+    public void resetApp() {
+
+        String appPackageName = app.getPackageName();
+
+        // Wait for launcher
+        final String launcherPackage = uiDevice.getLauncherPackageName();
+        assertThat(launcherPackage, notNullValue());
+        uiDevice.wait(Until.hasObject(By.pkg(launcherPackage).depth(0)),
+                LAUNCH_TIMEOUT);
+
+        // Launch the app
+        context = InstrumentationRegistry.getContext();
+        final Intent intent = context.getPackageManager()
+                .getLaunchIntentForPackage(appPackageName);
+
+        // Clear out any previous instances
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        context.startActivity(intent);
+
+        // Wait for the app to appear
+        uiDevice.wait(Until.hasObject(By.pkg(appPackageName).depth(0)),
+                LAUNCH_TIMEOUT);
+
+        uiDevice.waitForIdle(2000);
+
+        automaton.reset();
 
     }
 
@@ -169,7 +202,7 @@ public class BilityTester {
             return this;
         } catch (Exception e) {
             Log.e("BILITY EXCEPTION", e.getLocalizedMessage());
-            startupApp();
+            resetApp();
             return startTest();
         }
 
@@ -196,6 +229,21 @@ public class BilityTester {
             Log.e("TIMING", "GETTING NEW ACTION");
             UiInputActionType nextAction = !shouldGoBack ? getNextActionType() : UiInputActionType.BACK;
             Log.e("TIMING", "GOT ACTION: " + nextAction.name());
+
+            // Execute if non-subject action
+            switch (nextAction) {
+                case BACK:
+                    Log.e("TIMING", "PERFORMING " + nextAction);
+                    executeNextAction(nextAction, null);
+                    continue;
+                case RESET:
+                    Log.e("TIMING", "PERFORMING " + nextAction);
+                    previousStateCount = 0;
+                    resetApp();
+                    break;
+            }
+
+
             Log.e("TIMING", "GETTING NEW SUBJECT");
             UiObject subject = getNextActionSubject(nextAction);
 
@@ -217,14 +265,23 @@ public class BilityTester {
                 Log.e("TIMING", "ACTION FINISHED EXECUTING");
 
                 // Call the start loop again
+                // TODO: Use deep QueryController to catch errors and reset app / dismiss dialogs
                 uiDevice.waitForIdle(500);
 
                 Activity resultingActivity = getActivityInstance();
                 if (action != null && resultingActivity != null) {
                     String name = getIdentifierFromActivity(resultingActivity);
                     Log.e("NAMING", name);
-                    automaton.transitionFromCurrentState(action,
-                            new SimpleAutomataState(name));
+                    SimpleAutomataState newState = new SimpleAutomataState(name);
+                    if (newState.equals(prevState)) {
+                        previousStateCount++;
+                        Log.e("TIMING", "STILL ON OLD STATE");
+                    } else {
+                        prevState = newState;
+                        Log.e("TIMING", "ONTO A NEW STATE");
+                        previousStateCount = 0;
+                    }
+                    automaton.transitionFromCurrentState(action, newState);
                 }
 
                 Log.e("TIMING", "ABOUT TO START NEW LOOP");
@@ -408,6 +465,10 @@ public class BilityTester {
     private static final double LONGCLICK_PROB = 0.6;
 
     private UiInputActionType getNextActionType() {
+
+        if (previousStateCount >= 4) {
+            return UiInputActionType.RESET;
+        }
 
         float probDecider = rand.nextFloat();
         Log.e("PROBABILITY", "" + probDecider);

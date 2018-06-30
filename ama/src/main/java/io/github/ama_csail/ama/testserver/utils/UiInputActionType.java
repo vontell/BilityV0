@@ -5,5 +5,5 @@ package io.github.ama_csail.ama.testserver.utils;
  * @author Aaron Vontell
  */
 public enum UiInputActionType {
-    CLICK, LONGCLICK, SWIPE, BACK //, SHAKE, SPEECH, EXTERNAL_BUTTON, IMAGE
+    CLICK, LONGCLICK, SWIPE, BACK, RESET //, SHAKE, SPEECH, EXTERNAL_BUTTON, IMAGE
 }

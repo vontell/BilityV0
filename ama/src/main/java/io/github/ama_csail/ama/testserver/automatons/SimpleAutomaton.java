@@ -79,6 +79,10 @@ public class SimpleAutomaton {
 
     }
 
+    public void reset() {
+        this.currentState = this.startState;
+    }
+
     public boolean transitionFromCurrentState(SimpleAutomataAction action, SimpleAutomataState result) {
         boolean transitionAdded = this.addTransition(this.currentState, action, result);
         this.currentState = result;
